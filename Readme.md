@@ -1,0 +1,1 @@
+## Basic Weather App TUI made using Bubbletea Framework in Golang
