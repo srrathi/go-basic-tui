@@ -1,21 +1,33 @@
 package main
 
 import (
-	utils "weather-tui/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+	utils "weather-tui/utils"
 
-	
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 func main() {
+	if term.IsTerminal(0) {
+		println("in a term")
+	} else {
+		println("not in a term")
+	}
+	w, h, err := term.GetSize(0)
+	if err != nil {
+		return
+	}
+
 	t := textinput.NewModel()
 	t.Focus()
 
@@ -27,8 +39,10 @@ func main() {
 		spinner:   s,
 		typing:    true,
 		client:    &http.Client{Timeout: 10 * time.Second},
+		width:     w,
+		height:    h,
 	}
-	err := tea.NewProgram(initialModel, tea.WithAltScreen()).Start()
+	err = tea.NewProgram(initialModel, tea.WithAltScreen()).Start()
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -47,12 +61,16 @@ type Model struct {
 
 	citydata CityData
 	client   *http.Client
+
+	width  int
+	height int
 }
 
 type CityData struct {
-	Name string   `json:"name"`
-	Main MainData `json:"main"`
-	Err  error
+	Name   string   `json:"name"`
+	Main   MainData `json:"main"`
+	Err    error
+	Status string `json:"message"`
 }
 
 type MainData struct {
@@ -61,9 +79,6 @@ type MainData struct {
 
 func (m Model) fetchWeather(query string) tea.Cmd {
 	return func() tea.Msg {
-		// loc, err := m.metaWeather.LocationByQuery(context.Background(), query)
-
-		/////////////////////////////////////////////////////
 		resp, err := m.client.Get(utils.GetApiUrl(query))
 		var data CityData
 
@@ -75,16 +90,11 @@ func (m Model) fetchWeather(query string) tea.Cmd {
 
 		err = json.NewDecoder(resp.Body).Decode(&data)
 
-		// fmt.Printf("Data Object: %v\n", data)
-		// fmt.Println(data.Name)
-		// fmt.Println(data.Main.Temp)
-		// fmt.Printf("City %s Temp is %v Degree Celsius\n", data.Name, data.Main.Temp)
-		////////////////////////////////////////////////////
 		if err != nil {
 			return CityData{Err: err}
 		}
 
-		return CityData{Name: data.Name, Main: data.Main}
+		return data
 	}
 }
 
@@ -114,12 +124,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			if !m.typing && !m.loading {
 				m.textInput.Reset()
+				m.citydata.Name = ""
+				m.citydata.Status = ""
 				m.typing = true
 				m.err = nil
 				return m, nil
 			}
 
 		}
+
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
+		m.width = msg.Width
+		return m, nil
 
 	case CityData:
 		m.loading = false
@@ -128,8 +145,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if msg.Status != "" {
+			m.err = errors.New(msg.Status)
+			return m, nil
+		}
+
 		m.citydata.Name = msg.Name
 		m.citydata.Main = msg.Main
+		m.citydata.Status = msg.Status
 		return m, nil
 
 	}
@@ -150,18 +173,68 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+var subtle = lipgloss.Color("#00ff00")
+
+var dialogBoxStyle = lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#ffffff")).
+	Padding(1, 0).
+	BorderTop(true).
+	BorderLeft(true).
+	BorderRight(true).
+	BorderBottom(true)
+
+var locationInputStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("#00ff00")).
+	Background(lipgloss.Color("#000000")).
+	MarginRight(2).
+	Underline(true).
+	Padding(0, 3).
+	MarginTop(1).Bold(true)
+
 func (m *Model) View() string {
+	var ui string
 	if m.typing {
-		return fmt.Sprintf("Enter Location:\n%s", m.textInput.View())
+		question := lipgloss.NewStyle().Width(m.width / 2).Align(lipgloss.Center).Foreground(lipgloss.Color("#00ff00")).Render("Enter the name of location")
+		locationInput := locationInputStyle.Render(m.textInput.Value())
+		ui = lipgloss.JoinVertical(lipgloss.Center, question, locationInput)
 	}
 
 	if m.loading {
-		return fmt.Sprintf("%s fetching weather for you", m.spinner.View())
+		fetching := lipgloss.NewStyle().Width(m.width / 2).Align(lipgloss.Center).Foreground(lipgloss.Color("#00ff00")).Render("Fetching weather for you")
+		loading := locationInputStyle.Render(m.spinner.View())
+		ui = lipgloss.JoinVertical(lipgloss.Center, fetching, loading)
 	}
 
 	if err := m.err; err != nil {
-		return fmt.Sprintf("Could not fetch weather: %v\n", err)
+		fetching := lipgloss.NewStyle().
+			Width(m.width / 2).
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color("#ff0000")).
+			Render(fmt.Sprintf("Could not fetch weather: %v", err))
+		ui = lipgloss.JoinVertical(lipgloss.Center, fetching)
 	}
 
-	return fmt.Sprintf("Current Temperature in %s is %v Degree Celsius\n\nPress q to Quit, Esc for searching weather of a different city\n", m.citydata.Name, m.citydata.Main.Temp)
+	if (m.citydata.Name != "") && (m.citydata.Status == "") {
+		cityName := lipgloss.NewStyle().
+			Width(m.width / 2).
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color("#00ff00")).
+			Render(fmt.Sprintf("Current Temperature of %s", m.citydata.Name))
+		cityTemp := locationInputStyle.Render(fmt.Sprintf("%v ºC", m.citydata.Main.Temp))
+		ui = lipgloss.JoinVertical(lipgloss.Center, cityName, cityTemp)
+	}
+	instruction := lipgloss.NewStyle().
+	Align(lipgloss.Center).
+	Foreground(lipgloss.Color("#00ff00")).
+	Render("\nPress q to Quit, Esc for searching weather of a different city\n")
+
+	completeUi := lipgloss.JoinVertical(lipgloss.Center, dialogBoxStyle.Render(ui), instruction)
+	dialog := lipgloss.Place(m.width, 15,
+		lipgloss.Center, lipgloss.Center,
+		completeUi,
+		lipgloss.WithWhitespaceChars("="),
+		lipgloss.WithWhitespaceForeground(subtle),
+	)
+	return dialog
 }
