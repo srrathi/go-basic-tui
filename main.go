@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -173,11 +174,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-var subtle = lipgloss.Color("#00ff00")
+var subtle = lipgloss.Color("#808080")
 
 var dialogBoxStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#ffffff")).
+	BorderForeground(lipgloss.Color("#808080")).
 	Padding(1, 0).
 	BorderTop(true).
 	BorderLeft(true).
@@ -185,8 +186,13 @@ var dialogBoxStyle = lipgloss.NewStyle().
 	BorderBottom(true)
 
 var locationInputStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("#00ff00")).
-	Background(lipgloss.Color("#000000")).
+	Foreground(lipgloss.Color("#ffffff")).
+	Border(lipgloss.RoundedBorder()).
+	BorderTop(true).
+	BorderLeft(true).
+	BorderRight(true).
+	BorderBottom(true).
+	BorderForeground(lipgloss.Color("#808080")).
 	MarginRight(2).
 	Underline(true).
 	Padding(0, 3).
@@ -195,20 +201,20 @@ var locationInputStyle = lipgloss.NewStyle().
 func (m *Model) View() string {
 	var ui string
 	if m.typing {
-		question := lipgloss.NewStyle().Width(m.width / 2).Align(lipgloss.Center).Foreground(lipgloss.Color("#00ff00")).Render("Enter the name of location")
+		question := lipgloss.NewStyle().Width(int(math.Min(float64(m.width), 50))).Align(lipgloss.Center).Foreground(lipgloss.Color("#808080")).Render("Enter the name of location")
 		locationInput := locationInputStyle.Render(m.textInput.Value())
 		ui = lipgloss.JoinVertical(lipgloss.Center, question, locationInput)
 	}
 
 	if m.loading {
-		fetching := lipgloss.NewStyle().Width(m.width / 2).Align(lipgloss.Center).Foreground(lipgloss.Color("#00ff00")).Render("Fetching weather for you")
+		fetching := lipgloss.NewStyle().Width(int(math.Min(float64(m.width), 50))).Align(lipgloss.Center).Foreground(lipgloss.Color("#808080")).Render("Fetching weather for you")
 		loading := locationInputStyle.Render(m.spinner.View())
 		ui = lipgloss.JoinVertical(lipgloss.Center, fetching, loading)
 	}
 
 	if err := m.err; err != nil {
 		fetching := lipgloss.NewStyle().
-			Width(m.width / 2).
+			Width(int(math.Min(float64(m.width), 50))).
 			Align(lipgloss.Center).
 			Foreground(lipgloss.Color("#ff0000")).
 			Render(fmt.Sprintf("Could not fetch weather: %v", err))
@@ -217,23 +223,24 @@ func (m *Model) View() string {
 
 	if (m.citydata.Name != "") && (m.citydata.Status == "") {
 		cityName := lipgloss.NewStyle().
-			Width(m.width / 2).
+			Width(int(math.Min(float64(m.width), 50))).
 			Align(lipgloss.Center).
-			Foreground(lipgloss.Color("#00ff00")).
+			Foreground(lipgloss.Color("#ffffff")).
 			Render(fmt.Sprintf("Current Temperature of %s", m.citydata.Name))
 		cityTemp := locationInputStyle.Render(fmt.Sprintf("%v ºC", m.citydata.Main.Temp))
 		ui = lipgloss.JoinVertical(lipgloss.Center, cityName, cityTemp)
 	}
+
 	instruction := lipgloss.NewStyle().
 	Align(lipgloss.Center).
-	Foreground(lipgloss.Color("#00ff00")).
-	Render("\nPress q to Quit, Esc for searching weather of a different city\n")
+	Foreground(lipgloss.Color("#808080")).
+	Render("\nPress q to Quit\n\nEsc for searching weather of a different city\n")
 
 	completeUi := lipgloss.JoinVertical(lipgloss.Center, dialogBoxStyle.Render(ui), instruction)
-	dialog := lipgloss.Place(m.width, 15,
+	dialog := lipgloss.Place(m.width, m.height,
 		lipgloss.Center, lipgloss.Center,
 		completeUi,
-		lipgloss.WithWhitespaceChars("="),
+		lipgloss.WithWhitespaceChars(`¤ ☼ ☀ ☽ ☾ ☀ ☁ ☂ ☃ ☄`),
 		lipgloss.WithWhitespaceForeground(subtle),
 	)
 	return dialog
