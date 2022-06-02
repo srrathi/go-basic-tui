@@ -19,11 +19,6 @@ import (
 )
 
 func main() {
-	if term.IsTerminal(0) {
-		println("in a term")
-	} else {
-		println("not in a term")
-	}
 	w, h, err := term.GetSize(0)
 	if err != nil {
 		return
@@ -194,7 +189,6 @@ var locationInputStyle = lipgloss.NewStyle().
 	BorderBottom(true).
 	BorderForeground(lipgloss.Color("#808080")).
 	MarginRight(2).
-	Underline(true).
 	Padding(0, 3).
 	MarginTop(1).Bold(true)
 
@@ -223,18 +217,24 @@ func (m *Model) View() string {
 
 	if (m.citydata.Name != "") && (m.citydata.Status == "") {
 		cityName := lipgloss.NewStyle().
+		Underline(true).
+		Foreground(lipgloss.Color("#ffffff")).
+		Render(m.citydata.Name)
+
+		resultText := lipgloss.NewStyle().
 			Width(int(math.Min(float64(m.width), 50))).
 			Align(lipgloss.Center).
 			Foreground(lipgloss.Color("#ffffff")).
-			Render(fmt.Sprintf("Current Temperature of %s", m.citydata.Name))
+			Render(fmt.Sprintf("Current Temperature of %s", cityName))
 		cityTemp := locationInputStyle.Render(fmt.Sprintf("%v ºC", m.citydata.Main.Temp))
-		ui = lipgloss.JoinVertical(lipgloss.Center, cityName, cityTemp)
+		ui = lipgloss.JoinVertical(lipgloss.Center, resultText, cityTemp)
 	}
 
 	instruction := lipgloss.NewStyle().
 	Align(lipgloss.Center).
 	Foreground(lipgloss.Color("#808080")).
-	Render("\nPress q to Quit\n\nEsc for searching weather of a different city\n")
+	MarginRight(1).
+	Render("\n| Press q or ctrl+c to Quit |\n\n| Press Esc to search weather of a different city |\n")
 
 	completeUi := lipgloss.JoinVertical(lipgloss.Center, dialogBoxStyle.Render(ui), instruction)
 	dialog := lipgloss.Place(m.width, m.height,
