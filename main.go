@@ -66,7 +66,7 @@ type CityData struct {
 	Name   string   `json:"name"`
 	Main   MainData `json:"main"`
 	Err    error
-	Status string `json:"message"`
+	Status string `json:"message,omitempty"`
 }
 
 type MainData struct {
@@ -195,13 +195,21 @@ var locationInputStyle = lipgloss.NewStyle().
 func (m *Model) View() string {
 	var ui string
 	if m.typing {
-		question := lipgloss.NewStyle().Width(int(math.Min(float64(m.width), 50))).Align(lipgloss.Center).Foreground(lipgloss.Color("#808080")).Render("Enter the name of location")
+		question := lipgloss.NewStyle().
+			Width(int(math.Min(float64(m.width), 50))).
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color("#808080")).
+			Render("Enter the name of location")
 		locationInput := locationInputStyle.Render(m.textInput.Value())
 		ui = lipgloss.JoinVertical(lipgloss.Center, question, locationInput)
 	}
 
 	if m.loading {
-		fetching := lipgloss.NewStyle().Width(int(math.Min(float64(m.width), 50))).Align(lipgloss.Center).Foreground(lipgloss.Color("#808080")).Render("Fetching weather for you")
+		fetching := lipgloss.NewStyle().
+			Width(int(math.Min(float64(m.width), 50))).
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color("#808080")).
+			Render("Fetching weather for you")
 		loading := locationInputStyle.Render(m.spinner.View())
 		ui = lipgloss.JoinVertical(lipgloss.Center, fetching, loading)
 	}
@@ -217,9 +225,10 @@ func (m *Model) View() string {
 
 	if (m.citydata.Name != "") && (m.citydata.Status == "") {
 		cityName := lipgloss.NewStyle().
-		Underline(true).
-		Foreground(lipgloss.Color("#ffffff")).
-		Render(m.citydata.Name)
+			Underline(true).
+			Foreground(lipgloss.Color("#ffffff")).
+			Bold(true).
+			Render(m.citydata.Name)
 
 		resultText := lipgloss.NewStyle().
 			Width(int(math.Min(float64(m.width), 50))).
@@ -231,10 +240,10 @@ func (m *Model) View() string {
 	}
 
 	instruction := lipgloss.NewStyle().
-	Align(lipgloss.Center).
-	Foreground(lipgloss.Color("#808080")).
-	MarginRight(1).
-	Render("\n| Press q or ctrl+c to Quit |\n\n| Press Esc to search weather of a different city |\n")
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#808080")).
+		MarginRight(1).
+		Render("\n| Press q or ctrl+c to Quit |\n\n| Press Esc to search weather of a different city |\n")
 
 	completeUi := lipgloss.JoinVertical(lipgloss.Center, dialogBoxStyle.Render(ui), instruction)
 	dialog := lipgloss.Place(m.width, m.height,

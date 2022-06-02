@@ -1,4 +1,4 @@
-module weather-tui
+module github.com/srrathi/go-basic-tui
 
 go 1.17
 
